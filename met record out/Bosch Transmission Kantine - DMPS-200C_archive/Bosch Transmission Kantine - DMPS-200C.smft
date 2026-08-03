@@ -1,0 +1,8 @@
+<Device Model="DMPS-200-C. (old v1.2)" Name="DMPS-200-C.">
+   <Network Type="Cresnet" Id="06">
+      <Device Model="C2N-IO" DeviceId="A5"/>
+   </Network>
+   <Network Type="Ethernet" Id="07">
+      <Device Model="TSW-750" DeviceId="11"/>
+   </Network>
+</Device>

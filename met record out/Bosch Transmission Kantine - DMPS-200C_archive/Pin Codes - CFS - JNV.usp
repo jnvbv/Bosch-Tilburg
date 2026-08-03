@@ -1,0 +1,264 @@
+/***********************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+***********************************************************************/
+/*
+Dealer Name:
+System Name:
+System Number:
+Programmer:
+Comments:
+*/
+
+/***********************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+***********************************************************************/
+#SYMBOL_NAME	"Pin Codes - CFS - JNV"
+#HINT 			"Pin Code Manager with Crestron File System - JNV"
+// #DEFINE_CONSTANT
+#CATEGORY "46" "JNV" // Custom
+
+/*
+#HELP_BEGIN
+   (add additional lines of help lines)
+#HELP_END
+*/
+
+/***********************************************************************
+  Include Libraries
+  (Uncomment and include additional librarys as needed)
+***********************************************************************/
+// #CRESTRON_LIBRARY ""
+// #USER_LIBRARY ""
+
+/***********************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+  (Uncomment and declare inputs and outputs as needed)
+***********************************************************************/
+DIGITAL_INPUT		_SKIP_, _SKIP_, _SKIP_;
+DIGITAL_INPUT		key_0, key_1, key_2, key_3, key_4, key_5, key_6, key_7, key_8, key_9;
+DIGITAL_INPUT		key_clear, key_enter;
+DIGITAL_INPUT		enable_backdoor;
+DIGITAL_INPUT		read_file, save_file;
+DIGITAL_INPUT		store_code[8];
+
+DIGITAL_OUTPUT		_SKIP_, _SKIP_, _SKIP_;
+DIGITAL_OUTPUT		code_error, code_ok_backdoor, code_ok[8];
+STRING_OUTPUT		code_fb$, code_stars_fb$;
+
+/*******************************************************************************************
+  Parameters
+  (Uncomment and declare parameters as needed)
+*******************************************************************************************/
+INTEGER_PARAMETER	nr_of_digits;
+STRING_PARAMETER	backdoor_code$[10];
+STRING_PARAMETER	file_name$[256];
+
+/*******************************************************************************************
+  Parameter Properties
+  (Uncomment and declare parameter properties as needed)
+*******************************************************************************************/
+#BEGIN_PARAMETER_PROPERTIES nr_of_digits
+   propValidUnits = unitDecimal;
+   propDefaultUnit = unitDecimal;
+   propBounds = 1d, 10d;
+   propDefaultValue = 4d;
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES backdoor_code$
+   propValidUnits = unitString;
+   propDefaultUnit = unitString;
+   propDefaultValue = "";
+#END_PARAMETER_PROPERTIES
+
+/***********************************************************************
+  Global Variables
+  (Uncomment and declare global variables as needed)
+***********************************************************************/
+INTEGER		pos;  
+STRING		code_input$[10], code_stars$[10], codes$[7][10];  
+
+
+function ReadFile()
+{
+	signed_integer file_handle;
+	integer err;
+	
+	StartFileOperations();
+	
+	if(!CheckForDisk()) 
+	{
+		print("NOTICE: PinCodes - CFS - JNV: NO compact flash card found, reading from NVRAM instead\n");
+	}
+
+	file_handle = FileOpen(file_name$, _O_RDONLY | _O_TEXT) ;
+	if(file_handle < 0)
+	{
+		GenerateUserError("ERROR: PinCodes - CFS - JNV: Unable to open file: %s\n", file_name$);
+    }
+    else
+    {
+		err = ReadStringArray(file_handle, codes$);
+		if(err < 0)
+			GenerateUserError("ERROR: PinCodes - CFS - JNV: ReadStringArray(codes$) Error Code: %d\n", err);
+				     
+    	err = FileClose(file_handle);
+    	if(err)
+			GenerateUserError("ERROR: PinCodes - CFS - JNV: Unable to close file: %s (handle: %d)\n", file_name$, file_handle);
+    }
+      
+	EndFileOperations();
+}
+ 
+ 
+function SaveFile()
+{
+	signed_integer file_handle;
+	integer err;
+		
+	StartFileOperations();
+	
+	if(!CheckForDisk()) 
+	{
+		print("NOTICE: PinCodes - CFS - JNV: NO compact flash card found, saving to NVRAM instead\n");
+	}
+
+	file_handle = FileOpen(file_name$, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_TEXT) ;
+	if(file_handle < 0)
+	{
+		GenerateUserError("ERROR: PinCodes - CFS - JNV: Unable to open/create file: %s\n", file_name$);
+   	}
+   	else
+   	{
+		err = WriteStringArray(file_handle, codes$);
+		if(err < 0)
+			GenerateUserError("ERROR: PinCodes - CFS - JNV: WriteStringArray(codes$) Error Code: %d\n", err);
+				     
+   		err = FileClose(file_handle);
+   		if(err)
+			GenerateUserError("ERROR: PinCodes - CFS - JNV: Unable to close file: %s (handle: %d)\n", file_name$, file_handle);
+    }
+      
+	EndFileOperations();
+}
+
+
+push key_0, key_1, key_2, key_3, key_4, key_5, key_6, key_7, key_8, key_9 
+{
+	string ch$[1];
+
+	if(key_0) ch$ = "0";
+	if(key_1) ch$ = "1";
+	if(key_2) ch$ = "2";
+	if(key_3) ch$ = "3";
+	if(key_4) ch$ = "4";
+	if(key_5) ch$ = "5";
+	if(key_6) ch$ = "6";
+	if(key_7) ch$ = "7";
+	if(key_8) ch$ = "8";
+	if(key_9) ch$ = "9";
+
+	// Add digit to current input code
+	code_input$		= code_input$ + ch$;
+	code_fb$		= code_input$;
+    
+	// If we are in store mode we don't show the stars but we show the real code
+	if(store_code[1] || store_code[2] || store_code[3] || store_code[4] || store_code[5] || store_code[6] || store_code[7] || store_code[8])
+	{
+		code_stars_fb$	= code_input$;
+	}
+	else
+	{
+		code_stars$		= code_stars$ + "*";
+		code_stars_fb$	= code_stars$;
+	}
+}
+
+push key_clear
+{
+	code_input$		= "";
+	code_stars$		= "";
+
+	code_fb$		= "";
+	code_stars_fb$	= "";
+}
+
+push key_enter
+{
+	integer stored, matched;
+
+	stored = 0;
+	matched = 0;
+    
+	// Store Code if nr of digits is correct or clear/disable the code if no code is entered 
+	if((len(code_input$) = nr_of_digits) || (len(code_input$) = 0))
+	{
+		// Code 1 is the Master Code, so that one may not be cleared, otherwise we could lose code change control
+		if((len(code_input$) = nr_of_digits))
+			if(store_code[1])	{	codes$[0] = code_input$;	stored = 1;	}
+
+        // The other code may be cleared
+		if(store_code[2])	{	codes$[1] = code_input$;	stored = 1;	}
+		if(store_code[3])	{	codes$[2] = code_input$;	stored = 1;	}
+		if(store_code[4])	{	codes$[3] = code_input$;	stored = 1;	}
+		if(store_code[5])	{	codes$[4] = code_input$;	stored = 1;	}
+		if(store_code[6])	{	codes$[5] = code_input$;	stored = 1;	}
+		if(store_code[7])	{	codes$[6] = code_input$;	stored = 1;	}
+		if(store_code[8])	{	codes$[7] = code_input$;	stored = 1;	}
+    }
+
+	// If we did not store the code, check if we have a match
+	if((!stored) && (len(code_input$) = nr_of_digits))
+	{
+		if(code_input$ = codes$[0])	{	pulse(100, code_ok[1]);	matched = 1;	}
+		if(code_input$ = codes$[1])	{	pulse(100, code_ok[2]);	matched = 1;	}
+		if(code_input$ = codes$[2])	{	pulse(100, code_ok[3]);	matched = 1;	}
+		if(code_input$ = codes$[3])	{	pulse(100, code_ok[4]);	matched = 1;	}
+		if(code_input$ = codes$[4])	{	pulse(100, code_ok[5]);	matched = 1;	}
+		if(code_input$ = codes$[5])	{	pulse(100, code_ok[6]);	matched = 1;	}
+		if(code_input$ = codes$[6])	{	pulse(100, code_ok[7]);	matched = 1;	}
+		if(code_input$ = codes$[7])	{	pulse(100, code_ok[8]);	matched = 1;	}
+        
+		// Don't forget to check the backdoor code if enbaled
+		if((enable_backdoor) && (code_input$ = backdoor_code$))
+		{
+			pulse(100, code_ok_backdoor);
+			matched = 1;
+        }
+	}
+    
+	// If we did not store it or no match was found, the code had to be faulty
+	if(!matched && !stored)
+	{
+		pulse(100, code_error);
+	}
+    
+	code_input$		= "";
+	code_stars$		= "";
+
+	code_fb$		= "";
+	code_stars_fb$	= "";
+}
+
+push read_file
+{
+	// Read codes from file, this MUST be done after startup of your system (maybe after a little delay after booting)
+	call ReadFile();
+}
+
+push save_file
+{
+	// Write codes to filesystem
+	call SaveFile();
+}
+
+function Main()
+{
+	code_input$		= "";
+	code_stars$		= "";
+	
+	WaitForInitializationComplete();
+
+//	call ReadFile();
+}

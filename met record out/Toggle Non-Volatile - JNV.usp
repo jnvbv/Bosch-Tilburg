@@ -1,0 +1,119 @@
+/*******************************************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+Dealer Name:	JNV
+System Name:
+System Number:
+Programmer:		MDL
+Comments:
+*/
+
+/*******************************************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+*******************************************************************************************/
+#SYMBOL_NAME "Toggle Non-Volatile - JNV"
+#HINT "Toggle that remembers its state after a system reset"
+// #DEFINE_CONSTANT  
+#CATEGORY "46" "JNV" // Custom
+// #DEFAULT_VOLATILE
+#DEFAULT_NONVOLATILE
+/*
+#HELP_BEGIN
+   (add additional lines of help lines)
+#HELP_END
+*/
+
+/*******************************************************************************************
+  Include Libraries
+  (Uncomment and include additional librarys as needed)
+*******************************************************************************************/
+// #CRESTRON_LIBRARY ""
+// #USER_LIBRARY ""
+
+/*******************************************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+  (Uncomment and declare inputs and outputs as needed)
+*******************************************************************************************/
+DIGITAL_INPUT	set, reset;
+DIGITAL_INPUT	clock;
+// ANALOG_INPUT 
+// STRING_INPUT 
+// BUFFER_INPUT 
+
+DIGITAL_OUTPUT	out, out_not;
+// ANALOG_OUTPUT 
+// STRING_OUTPUT 
+
+/*******************************************************************************************
+  Global Variables
+  (Uncomment and declare global variables as needed)
+*******************************************************************************************/
+INTEGER		mem;
+// STRING
+
+/*******************************************************************************************
+  Functions
+  (Add any additional functions here)
+  Note:  Functions must be physically placed before the location in
+         the code that calls them.
+*******************************************************************************************/
+
+function Update()
+{
+	if(mem)
+	{
+		out_not = 0;
+		out = 1;	
+	}
+	else
+	{
+		out = 0;
+		out_not = 1;
+	}
+}
+
+
+
+/*******************************************************************************************
+  Event Handlers
+  (Uncomment and declare additional event handlers as needed)
+*******************************************************************************************/
+
+push set
+{
+	mem = 1;
+	call Update();
+}
+
+push reset
+{
+	mem = 0;
+	call Update();
+}
+
+push clock
+{
+	if(mem)
+		mem = 0;
+	else
+		mem = 1;
+
+	call Update();
+}
+
+/*******************************************************************************************
+  Main()
+  Uncomment and place one-time startup code here
+  (This code will get called when the system starts up)
+*******************************************************************************************/
+
+Function Main()
+{
+    WaitForInitializationComplete();
+    call Update();
+}
+
+

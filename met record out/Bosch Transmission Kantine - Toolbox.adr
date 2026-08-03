@@ -1,0 +1,15 @@
+[Entries]
+DMPS=tcp 10.100.10.11
+TP=tcp 10.100.10.13
+DMPS-VIDEO=tcp 10.100.10.12
+USB=usb
+
+[Settings]
+DefaultEntry=
+
+[Comments]
+DMPS=
+TP=
+DMPS-VIDEO=
+USB=
+
